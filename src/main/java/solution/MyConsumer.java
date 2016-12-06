@@ -19,7 +19,7 @@ public class MyConsumer {
     public static void main(String[] args) throws IOException {
         configureConsumer(args);
 
-        String topic = "/user/user01/pump:sensor";
+        String topic = "/var/mapr/mapr.monitoring/1854984825002990623:mfs81.qa.lab_cpu.percent";
         if (args.length == 1) {
             topic = args[0];
         }
