@@ -10,9 +10,9 @@
         <maven.compiler.target>1.7</maven.compiler.target>
         <encoding>UTF-8</encoding>
         <scala.version>2.10.5</scala.version>
-        <scala.tools.version>2.10</scala.tools.version>
-        <spark.version>1.6.1-mapr-1607</spark.version>
-        <maven-scala-plugin.version>2.15.2</maven-scala-plugin.version>      
+        <scala.tools.version>2.11</scala.tools.version>
+        <spark.version>2.0.1-mapr-1611</spark.version>
+        <maven-scala-plugin.version>2.15.2</maven-scala-plugin.version>
     </properties> 
     
     <repositories>
@@ -23,7 +23,7 @@
         </repository>
         <repository>
             <id>mapr-releases</id>
-            <url>http://repository.mapr.com/maven/</url>
+            <url>http://artifactory.devops.lab/artifactory/list/maven-mapr-central/</url>
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
@@ -40,6 +40,21 @@
         </pluginRepository>
     </pluginRepositories>
     <dependencies>
+    		<dependency>
+						<groupId>com.mapr.streams</groupId>
+						<artifactId>mapr-streams</artifactId>
+						<version>5.2.0-mapr</version>
+				</dependency>
+				<dependency>
+						<groupId>com.sun.jersey</groupId>
+						<artifactId>jersey-client</artifactId>
+						<version>1.8</version>
+				</dependency>
+				<dependency>
+						<groupId>com.fasterxml.jackson.core</groupId>
+						<artifactId>jackson-databind</artifactId>
+						<version>2.7.4</version>
+				</dependency>
     		<dependency>
         		<groupId>com.typesafe.akka</groupId>
         		<artifactId>akka-actor_2.10</artifactId>
@@ -68,13 +83,13 @@
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-streaming-kafka-v09_2.10</artifactId>
+            <artifactId>spark-streaming-kafka-0-9_2.11</artifactId>
             <version>${spark.version}</version>          
         </dependency>
         <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-streaming-kafka-producer_2.10</artifactId>
-            <version>${spark.version}</version>          
+            <groupId>com.tdunning</groupId>
+            <artifactId>t-digest</artifactId>
+            <version>3.2-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -87,8 +102,11 @@
                 </exclusion>
             </exclusions>      
         </dependency>
-        
-
+        <dependency>
+    				<groupId>com.mapr.db</groupId>
+    				<artifactId>maprdb</artifactId>
+    				<version>5.2.0-mapr</version>
+  			</dependency>
     </dependencies>
     <build>
         <plugins>
@@ -111,5 +129,5 @@
             </plugin>
         </plugins>  
     </build>
-    <name>ms-sparkstreaming</name>
+    <name>spyglass</name>
 </project>

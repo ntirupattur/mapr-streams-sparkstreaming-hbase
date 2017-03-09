@@ -1,7 +1,7 @@
 /**
  * 
  */
-package model;
+package com.mapr.spyglass.model;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -12,7 +12,13 @@ import java.util.Map.Entry;
  * @author ntirupattur
  *
  */
-public class Metric {
+public class Metric implements java.io.Serializable {
+
+
+  /**
+   * 
+   */
+  private static final long serialVersionUID = 1L;
 
 
   public Metric() {}
