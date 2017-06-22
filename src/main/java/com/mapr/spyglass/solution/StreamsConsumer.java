@@ -4,11 +4,9 @@ package com.mapr.spyglass.solution;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.log4j.Logger;
@@ -22,16 +20,15 @@ import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaDStream;
 import org.apache.spark.streaming.api.java.JavaInputDStream;
 import org.apache.spark.streaming.api.java.JavaPairDStream;
-import org.apache.spark.streaming.api.java.JavaPairInputDStream;
 import org.apache.spark.streaming.api.java.JavaStreamingContext;
 import org.apache.spark.streaming.kafka09.ConsumerStrategies;
 import org.apache.spark.streaming.kafka09.KafkaUtils;
 import org.apache.spark.streaming.kafka09.LocationStrategies;
 
-import scala.Tuple2;
-
 import com.mapr.spyglass.dao.MetricsDao;
 import com.mapr.spyglass.model.Metric;
+
+import scala.Tuple2;
 
 
 public class StreamsConsumer {
@@ -46,7 +43,7 @@ public class StreamsConsumer {
     final HashMap<String,String> tagsMap = new HashMap<String,String>();
     
     // Usage: application jar <stream name> <topic name> <tagk1=tagv1,tagk2=tagv2..> <batchDuration> <alertDuration> <alertThreshold> <hostname> <tableName>
-    //topicName = "/var/mapr/mapr.monitoring/1854984825002990623:mfs81.qa.lab_cpu.percent";
+    //topicName = "mfs81.qa.lab_cpu.percent";
     //streamName = "/var/mapr/mapr.monitoring/1854984825002990623";
     // tableName = "/var/mapr/mapr.monitoring/aggregates";
     if (args != null && args.length==8) {

@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>mapr</groupId>
-    <artifactId>ms-sparkstreaming</artifactId>
+    <artifactId>anomalydetection</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
     <properties>
@@ -11,7 +11,7 @@
         <encoding>UTF-8</encoding>
         <scala.version>2.10.5</scala.version>
         <scala.tools.version>2.11</scala.tools.version>
-        <spark.version>2.0.1-mapr-1611</spark.version>
+        <spark.version>2.1.0-mapr-1703</spark.version>
         <maven-scala-plugin.version>2.15.2</maven-scala-plugin.version>
     </properties> 
     
@@ -43,7 +43,7 @@
     		<dependency>
 						<groupId>com.mapr.streams</groupId>
 						<artifactId>mapr-streams</artifactId>
-						<version>5.2.0-mapr</version>
+						<version>5.2.1-mapr</version>
 				</dependency>
 				<dependency>
 						<groupId>com.sun.jersey</groupId>
@@ -94,7 +94,7 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>0.9.0.0-mapr-1607-streams-5.2.0</version>  
+            <version>0.9.0.0-mapr-1703-streams-5.2.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.zookeeper</groupId>
