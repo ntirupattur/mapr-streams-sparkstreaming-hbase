@@ -97,12 +97,13 @@ public class TDigestBuilder {
 
       @Override
       public Metric call(ConsumerRecord<String, String> tuple2) throws Exception {
-        Metric metric = Metric.getMetricFromString(tuple2.value().split(" "));
+        log.info("Tuple value: "+tuple2.value().trim());
+        Metric metric = Metric.getMetricFromString(tuple2.value().trim().split(" "));
         return metric;
       }
     });
 
- // Create a mapped stream of <metric name, metric>
+    // Create a mapped stream of <metric name, metric>
     JavaPairDStream<Tuple2<String,String>, Metric> metricStream = metricsStream.mapToPair(new PairFunction<Metric, Tuple2<String, String>, Metric>() {
       private static final long serialVersionUID = -4060881513029929674L;
       @Override
@@ -132,7 +133,7 @@ public class TDigestBuilder {
               td.add(m.getValue());
               count++;
             }
-            log.info("Aggregated Tuple2: "+metricsList._1()+" "+count);
+            log.info("Adding t-digest for metric: "+metricsList._1()._1()+" with tags"+metricsList._1()._2()+" count "+count);
             metricsDao.addTDigest(metricsList._1()._1(),System.currentTimeMillis(),metricsList._1()._2(), td,count,batchDurationInSec);
           }
         }

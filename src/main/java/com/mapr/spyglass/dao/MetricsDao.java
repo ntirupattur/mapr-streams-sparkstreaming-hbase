@@ -74,6 +74,7 @@ public class MetricsDao implements java.io.Serializable {
 	// Add histogram to document with id "documentkey.timestamp"
 	public void addHistogram(String documentKey,long timestamp, String tags, FloatHistogram histogram, String metricName, double count, int windowDuration) throws Exception{
 		String query = documentKey+timestamp;
+		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) histogram);
 		Document rec = Json.newDocument()
 				.set("histogram",Base64.encodeBase64String(tempByteArray))
@@ -90,6 +91,7 @@ public class MetricsDao implements java.io.Serializable {
 	// Add histogram to document with id "metricName.timestamp"
 	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
 		String query = metricName+timestamp;
+		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
 		Document rec = Json.newDocument()
 				.set("tdigest",Base64.encodeBase64String(tempByteArray))
