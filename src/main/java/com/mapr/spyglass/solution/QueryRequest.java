@@ -5,13 +5,17 @@ package com.mapr.spyglass.solution;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.log4j.Logger;
 import org.ojai.Document;
 import org.ojai.DocumentStream;
 import org.ojai.store.QueryCondition;
@@ -31,11 +35,13 @@ import com.tdunning.math.stats.FloatHistogram;
  */
 public class QueryRequest {
 	/*
-	 * Usage: com.mapr.spyglass.solution.QueryRequest <tableName> <tagKey> <fromDuration> <toDuration> <windowDurationInSecs> <threshold> [<tagk1=tagv1,tagk2=tagv2..>]
-	 * Example 1: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 1000 [op=insert]
-	 * Example 2: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 10
-	 * Example 3: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 20 [op=insert,fqdn=qa102-40.qa.lab]
+	 * Usage: com.mapr.spyglass.solution.QueryRequest <tableName> <tagKey> <fromDuration> <toDuration> <windowDurationInSecs> <threshold> <documentType> [<tagk1=tagv1,tagk2=tagv2..>]
+	 * Example 1: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 1000 histogram [op=insert]
+	 * Example 2: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/t-digest/ cpu.percent 1m-ago now 60 10 tdigest [cpu_core=0, cpu_class=idle]
+	 * Example 3: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 20 histogram [op=insert,fqdn=qa102-40.qa.lab]
 	 */
+	private static final Logger log = Logger.getLogger(QueryRequest.class);
+	
 	public static void main(String[] args) {
 		if (args.length < 6) {
 			printUsage();
@@ -48,21 +54,27 @@ public class QueryRequest {
 		String toDuration = args[3];
 		String windowDurationInSec = args[4];
 		String threshold = args[5];
+		String documentType = args[6];
 		String tags = "";
 
-		if (args.length == 7) {
-			tags = args[6];
+		if (args.length == 8) {
+			tags = args[7];
 		}
-
-		List<String> results = performComputations(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, threshold,
-				tags);
-		for (String result : results)
-			System.out.println(result);
+		
+		//List<String> results = performComputations(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, threshold,tags,documentType);
+		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+		for (Document d : documentsList) {
+			System.out.println(d.getId());
+			System.out.println(d.getInt("count"));
+			System.out.println(d.getString("tags"));
+			System.out.println(d.getString("hash"));
+		}
 	}
+	
 	public static Map<String, FloatHistogram> getAggregatedHistogram(String tableName, String tagKey,
 			String fromDuration, String toDuration, String windowDurationInSec, String tags) throws Exception {
 		Map<String, FloatHistogram> histogramMap = new HashMap<String, FloatHistogram>();
-		List<Document> documentsList = getHistogram(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
 		for (Document d : documentsList) {
 			String key = d.getString("tags").trim().replaceAll("\\{|\\}", "");
 			FloatHistogram histogram = (FloatHistogram) SerializationUtils
@@ -76,15 +88,15 @@ public class QueryRequest {
 		return histogramMap;
 	}
 
-	public static List<String> performComputations(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String threshold, String tags) {
+	public static List<String> performComputations(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String threshold, String tags, String documentType) {
 		List<String> results = new ArrayList<String>();
 		try {
-			List<Document> documentsList = getHistogram(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+			List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
 			List<Observation> observations = new ArrayList<Observation>();
 			int count = 0;
 			for (Document d : documentsList) {
 				FloatHistogram histogram = (FloatHistogram) SerializationUtils
-						.deserialize(Base64.decodeBase64(d.getString("histogram")));
+						.deserialize(Base64.decodeBase64(d.getString(documentType)));
 				List<String> tagsList = Arrays.asList(d.getString("tags").trim().replaceAll("\\{|\\}", "").split("\\s*,\\s*"));
 				String metricName = d.getString("metricname");
 				int windowDuration = d.getInt("windowduration");
@@ -102,7 +114,7 @@ public class QueryRequest {
 		return results;
 	}
 
-	public static List<Document> getHistogram(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String tags) {
+	public static List<Document> getDocuments(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String tags) {
 		List<Document> documentsList = new ArrayList<Document>();
 		try {
 			if (!(MapRDB.tableExists(tableName))) {
@@ -110,30 +122,38 @@ public class QueryRequest {
 			}
 
 			Table table = MapRDB.getTable(tableName);
+			//	get Calendar instance
+	    Calendar now = Calendar.getInstance();
+	    //get current TimeZone using getTimeZone method of Calendar class
+	    TimeZone timeZone = now.getTimeZone();
+	    String timeZoneId = timeZone.getID();
 
 			QueryCondition condition = MapRDB.newCondition().and().matches("_id", tagKey)
 					.is("timestamp", QueryCondition.Op.GREATER_OR_EQUAL,
-							DateTime.parseDateTimeString(fromDuration, "PST")) // TODO - Get current timezone
+							DateTime.parseDateTimeString(fromDuration, timeZoneId)) 
 					.is("timestamp", QueryCondition.Op.LESS_OR_EQUAL,
 							((toDuration == null) || (toDuration.isEmpty()))
 							? System.currentTimeMillis()
-									: DateTime.parseDateTimeString(toDuration, "PST")) // TODO - Get current timezone
+									: DateTime.parseDateTimeString(toDuration,  timeZoneId)) 
 					.is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
 
 			if ((tags != null) && (!(tags.isEmpty()))) {
 				QueryCondition optionalCondition = MapRDB.newCondition()
-						.matches("hash", StringsUtil.getHashForTags(tags)).build();
+						.matches("hash", StringsUtil.getRegexForTags(tags)).build();
 				condition.condition(optionalCondition).close().build();
 			} else {
 				condition.close().build();
 			}
-			System.out.println("Condition: " + condition);
+			
+			log.info("Condition: " + condition);
 			DocumentStream docStream = table.find(condition);
 			Iterator<Document> documentsIterator = docStream.iterator();
 			while (documentsIterator.hasNext()) {
 				Document d = (Document) documentsIterator.next();
 				documentsList.add(d);
 			}
+			
+			log.info("Documents Size: "+documentsList.size());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -179,7 +199,7 @@ public class QueryRequest {
 
 	public static void printUsage() {
 		System.out.println("==============================================================================================");
-		System.out.println("Usage: com.mapr.spyglass.solution.QueryRequest <tableName> <tagKey> <fromDuration> <toDuration> <threshold> [<tagk1=tagv1,tagk2=tagv2..>]\n");
+		System.out.println("Usage: com.mapr.spyglass.solution.QueryRequest <tableName> <tagKey> <fromDuration> <toDuration> <windowDurationInSecs> <threshold> [<tagk1=tagv1,tagk2=tagv2..>]\n");
 		System.out.println("Example 1: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 1000 [op=insert]\n"
 				+ "Example 2: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 now 60 20"
 				+ "Example 3: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1m-ago 1488913082690 60 10 [op=insert,fqdn=qa102-40.qa.lab]");

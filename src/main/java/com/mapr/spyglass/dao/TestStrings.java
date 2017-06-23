@@ -16,10 +16,15 @@ public class TestStrings {
   public static void main(String[] args) {
     // TODO Auto-generated method stub
     String s = "op=insert,fqdn=qa102-40.qa.lab,app=xyz";
-
+    try {
+			System.out.println(StringsUtil.getHashForTags("{cpu_class=steal, fqdn=mfs81.qa.lab, clustername=my.cluster.com, cpu_core=0, clusterid=2992001618649411846}"));
+		} catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
     try {
       //System.out.println(StringsUtil.getHashForTags(s));
-      testLLR();
+      //testLLR();
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
