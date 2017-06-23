@@ -8,13 +8,15 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import org.apache.log4j.Logger;
+
 /**
  * @author ntirupattur
  * Class with static methods to generate hashes for individual strings or tags
  *
  */
 public class StringsUtil {
-
+	private static final Logger log = Logger.getLogger(StringsUtil.class);
 	public static String getHashForTags(String tags) throws Exception {
 		List<String> tagsList = getTagsList(tags);
 		StringBuffer hashForTags = new StringBuffer();
@@ -22,6 +24,7 @@ public class StringsUtil {
 			hashForTags.append(getHash((tag.trim())));
 			hashForTags.append("|");
 		}
+		log.info("Generated hash for tags: "+tags+" "+hashForTags.toString());
 		return hashForTags.substring(0, hashForTags.length()-1).toString();
 	}
 

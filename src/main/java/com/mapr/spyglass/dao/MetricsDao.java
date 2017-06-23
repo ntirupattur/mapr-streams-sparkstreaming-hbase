@@ -85,22 +85,23 @@ public class MetricsDao implements java.io.Serializable {
 				.set("windowduration", windowDuration)
 				.set("count", count);
 
-		table.insertOrReplace(query, rec);
+		table.insert(query, rec);
 	}
 
 	// Add histogram to document with id "metricName.timestamp"
 	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
-		String query = metricName+timestamp;
+		String hash = StringsUtil.getHashForTags(tags);
+		String query = metricName+timestamp+hash;
 		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
 		Document rec = Json.newDocument()
 				.set("tdigest",Base64.encodeBase64String(tempByteArray))
 				.set("timestamp",timestamp)
-				.set("hash",StringsUtil.getHashForTags(tags))
+				.set("hash",hash)
 				.set("tags",tags)
 				.set("windowduration", windowDuration)
 				.set("count", count);
-		table.insertOrReplace(query, rec);
+		table.insert(query, rec);
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios
