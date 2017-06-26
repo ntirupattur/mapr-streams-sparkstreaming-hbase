@@ -92,6 +92,7 @@ public class MetricsDao implements java.io.Serializable {
 	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
 		String hash = StringsUtil.getHashForTags(tags);
 		String query = metricName+timestamp+hash;
+		Calendar calendar = Calendar.getInstance();
 		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
 		Document rec = Json.newDocument()
@@ -100,8 +101,11 @@ public class MetricsDao implements java.io.Serializable {
 				.set("hash",hash)
 				.set("tags",tags)
 				.set("windowduration", windowDuration)
-				.set("count", count);
+				.set("count", count)
+				.set("hour", calendar.get(Calendar.HOUR_OF_DAY))
+				.set("minute", calendar.get(Calendar.MINUTE));
 		table.insert(query, rec);
+		calendar = null;
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios
@@ -131,7 +135,7 @@ public class MetricsDao implements java.io.Serializable {
 			} catch (NoSuchElementException ne) {
 				tDigest = "";
 			} catch (Exception e) {
-				//TODO - Add logging
+				log.error("Failed with exception: "+e.getStackTrace());
 				return false;
 			}
 		}

@@ -62,19 +62,21 @@ public class QueryRequest {
 		}
 		
 		//List<String> results = performComputations(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, threshold,tags,documentType);
-		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags, null, null);
 		for (Document d : documentsList) {
 			System.out.println(d.getId());
 			System.out.println(d.getInt("count"));
 			System.out.println(d.getString("tags"));
 			System.out.println(d.getString("hash"));
+			System.out.println(d.getInt("minute"));
+			System.out.println(d.getInt("hour"));
 		}
 	}
 	
 	public static Map<String, FloatHistogram> getAggregatedHistogram(String tableName, String tagKey,
 			String fromDuration, String toDuration, String windowDurationInSec, String tags) throws Exception {
 		Map<String, FloatHistogram> histogramMap = new HashMap<String, FloatHistogram>();
-		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags, null,null);
 		for (Document d : documentsList) {
 			String key = d.getString("tags").trim().replaceAll("\\{|\\}", "");
 			FloatHistogram histogram = (FloatHistogram) SerializationUtils
@@ -91,7 +93,7 @@ public class QueryRequest {
 	public static List<String> performComputations(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String threshold, String tags, String documentType) {
 		List<String> results = new ArrayList<String>();
 		try {
-			List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags);
+			List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags, null, null);
 			List<Observation> observations = new ArrayList<Observation>();
 			int count = 0;
 			for (Document d : documentsList) {
@@ -114,7 +116,7 @@ public class QueryRequest {
 		return results;
 	}
 
-	public static List<Document> getDocuments(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String tags) {
+	public static List<Document> getDocuments(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String tags, String hourOfDay, String minuteOfHour) {
 		List<Document> documentsList = new ArrayList<Document>();
 		try {
 			if (!(MapRDB.tableExists(tableName))) {
@@ -140,10 +142,22 @@ public class QueryRequest {
 			if ((tags != null) && (!(tags.isEmpty()))) {
 				QueryCondition optionalCondition = MapRDB.newCondition()
 						.matches("hash", StringsUtil.getRegexForTags(tags)).build();
-				condition.condition(optionalCondition).close().build();
-			} else {
-				condition.close().build();
+				condition.condition(optionalCondition);
 			}
+
+			if ((hourOfDay != null) && (!(hourOfDay.isEmpty()))) {
+				QueryCondition optionalCondition1 = MapRDB.newCondition()
+						.is("hour", QueryCondition.Op.EQUAL, Integer.parseInt(hourOfDay)).build();
+				condition.condition(optionalCondition1);
+			}
+
+			if ((minuteOfHour != null) && (!(minuteOfHour.isEmpty()))) {
+				QueryCondition optionalCondition2 = MapRDB.newCondition()
+						.is("minute", QueryCondition.Op.EQUAL, Integer.parseInt(minuteOfHour)).build();
+				condition.condition(optionalCondition2);
+			}
+
+			condition.close().build();
 			
 			log.info("Condition: " + condition);
 			DocumentStream docStream = table.find(condition);
@@ -152,10 +166,10 @@ public class QueryRequest {
 				Document d = (Document) documentsIterator.next();
 				documentsList.add(d);
 			}
-			
+
 			log.info("Documents Size: "+documentsList.size());
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Failed with exception: "+e.getStackTrace());
 		}
 
 		return documentsList;
