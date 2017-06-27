@@ -6,7 +6,6 @@ package com.mapr.spyglass.solution;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -116,7 +115,7 @@ public class QueryRequest {
 		return results;
 	}
 
-	public static List<Document> getDocuments(String tableName, String tagKey, String fromDuration, String toDuration, String windowDurationInSec, String tags, String hourOfDay, String minuteOfHour) {
+	public static List<Document> getDocuments(String tableName, String documentKey, String fromDuration, String toDuration, String windowDurationInSec, String tags, String hourOfDay, String minuteOfHour) {
 		List<Document> documentsList = new ArrayList<Document>();
 		try {
 			if (!(MapRDB.tableExists(tableName))) {
@@ -124,13 +123,16 @@ public class QueryRequest {
 			}
 
 			Table table = MapRDB.getTable(tableName);
+			log.info("Table: "+table.getPath());
 			//	get Calendar instance
 	    Calendar now = Calendar.getInstance();
 	    //get current TimeZone using getTimeZone method of Calendar class
 	    TimeZone timeZone = now.getTimeZone();
 	    String timeZoneId = timeZone.getID();
+	    log.info("Time Zone: "+ timeZoneId);
+	    log.info("Document Key: "+documentKey);
 
-			QueryCondition condition = MapRDB.newCondition().and().matches("_id", tagKey)
+			QueryCondition condition = MapRDB.newCondition().and().matches("_id", documentKey)
 					.is("timestamp", QueryCondition.Op.GREATER_OR_EQUAL,
 							DateTime.parseDateTimeString(fromDuration, timeZoneId)) 
 					.is("timestamp", QueryCondition.Op.LESS_OR_EQUAL,
@@ -169,7 +171,8 @@ public class QueryRequest {
 
 			log.info("Documents Size: "+documentsList.size());
 		} catch (Exception e) {
-			log.error("Failed with exception: "+e.getStackTrace());
+			e.printStackTrace();
+			log.error("Failed with exception: "+e.getMessage());
 		}
 
 		return documentsList;
