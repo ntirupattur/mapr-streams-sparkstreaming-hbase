@@ -94,10 +94,10 @@ public class MetricsDao implements java.io.Serializable {
 	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
 		String hash = StringsUtil.getHashForTags(tags);
 		Calendar now = Calendar.getInstance();
-		//get current TimeZone using getTimeZone method of Calendar class
-    TimeZone timeZone = now.getTimeZone();
-    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
-    String query = metricName+previous.getTimeInMillis()+hash;
+//		//get current TimeZone using getTimeZone method of Calendar class
+//    TimeZone timeZone = now.getTimeZone();
+//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
+    String query = metricName+timestamp+hash;
 		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
 		Document rec = Json.newDocument()

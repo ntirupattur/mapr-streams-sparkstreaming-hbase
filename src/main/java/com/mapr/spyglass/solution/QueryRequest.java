@@ -132,20 +132,18 @@ public class QueryRequest {
 	    log.info("Time Zone: "+ timeZoneId);
 	    log.info("Document Key: "+documentKey);
 
-			QueryCondition condition = MapRDB.newCondition().and().matches("_id", documentKey)
-					.is("timestamp", QueryCondition.Op.GREATER_OR_EQUAL,
-							DateTime.parseDateTimeString(fromDuration, timeZoneId)) 
-					.is("timestamp", QueryCondition.Op.LESS_OR_EQUAL,
-							((toDuration == null) || (toDuration.isEmpty()))
-							? System.currentTimeMillis()
-									: DateTime.parseDateTimeString(toDuration,  timeZoneId)) 
-					.is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
+	    String fromId = documentKey+DateTime.parseDateTimeString(fromDuration, timeZoneId);
+	    String toId = documentKey+(((toDuration == null) || (toDuration.isEmpty())) ? System.currentTimeMillis(): DateTime.parseDateTimeString(toDuration,  timeZoneId));
+
+	    QueryCondition condition = MapRDB.newCondition().and().is("_id", QueryCondition.Op.GREATER_OR_EQUAL, fromId)
+	      .is("_id", QueryCondition.Op.LESS_OR_EQUAL, toId)
+        .is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
 
 			if ((tags != null) && (!(tags.isEmpty()))) {
 				QueryCondition optionalCondition = MapRDB.newCondition()
 						.matches("hash", StringsUtil.getRegexForTags(tags)).build();
 				condition.condition(optionalCondition);
-			}
+	    }
 
 			if ((hourOfDay != null) && (!(hourOfDay.isEmpty()))) {
 				QueryCondition optionalCondition1 = MapRDB.newCondition()
