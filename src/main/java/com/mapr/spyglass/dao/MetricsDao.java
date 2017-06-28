@@ -8,6 +8,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+import java.util.TimeZone;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.SerializationUtils;
@@ -22,6 +23,7 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TableDescriptor;
 import com.mapr.spyglass.model.Metric;
+import com.mapr.spyglass.solution.DateTime;
 import com.mapr.spyglass.solution.StringsUtil;
 import com.tdunning.math.stats.FloatHistogram;
 import com.tdunning.math.stats.MergingDigest;
@@ -91,8 +93,11 @@ public class MetricsDao implements java.io.Serializable {
 	// Add histogram to document with id "metricName.timestamp"
 	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
 		String hash = StringsUtil.getHashForTags(tags);
-		String query = metricName+timestamp+hash;
-		Calendar calendar = Calendar.getInstance();
+		Calendar now = Calendar.getInstance();
+		//get current TimeZone using getTimeZone method of Calendar class
+    TimeZone timeZone = now.getTimeZone();
+    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
+    String query = metricName+previous.getTimeInMillis()+hash;
 		log.info("Adding document: "+query);
 		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
 		Document rec = Json.newDocument()
@@ -102,10 +107,10 @@ public class MetricsDao implements java.io.Serializable {
 				.set("tags",tags)
 				.set("windowduration", windowDuration)
 				.set("count", count)
-				.set("hour", calendar.get(Calendar.HOUR_OF_DAY))
-				.set("minute", calendar.get(Calendar.MINUTE));
+				.set("hour", now.get(Calendar.HOUR_OF_DAY))
+				.set("minute", now.get(Calendar.MINUTE));
 		table.insert(query, rec);
-		calendar = null;
+		now = null;
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios
