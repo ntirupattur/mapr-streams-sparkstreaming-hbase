@@ -4,6 +4,7 @@ package com.mapr.spyglass.solution;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import org.apache.spark.streaming.kafka09.LocationStrategies;
 
 import com.mapr.spyglass.dao.MetricsDao;
 import com.mapr.spyglass.model.Metric;
+import com.mapr.spyglass.model.Observation;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 
@@ -119,6 +121,7 @@ public class TDigestBuilder {
     });
     
     final MetricsDao metricsDao = new MetricsDao(tableName);
+    final Calendar now = Calendar.getInstance();
     metricStream.groupByKey().foreachRDD(new VoidFunction<JavaPairRDD<Tuple2<String,String>,Iterable<Metric>>>() {
       private static final long serialVersionUID = 5290630432755196589L;
       @Override
@@ -128,13 +131,14 @@ public class TDigestBuilder {
         if (keyedMetricsList != null && !keyedMetricsList.isEmpty()) {
         	final TDigest td = new MergingDigest(200);
           for (Tuple2<Tuple2<String, String>, Iterable<Metric>> metricsList: keyedMetricsList) {
-            double count = 0;
+            int count = 0;
             for (Metric m: metricsList._2()) {
               td.add(m.getValue());
               count++;
             }
             log.info("Adding t-digest for metric: "+metricsList._1()._1()+" with tags"+metricsList._1()._2()+" count "+count);
-            metricsDao.addTDigest(metricsList._1()._1(),System.currentTimeMillis(),metricsList._1()._2(), td,count,batchDurationInSec);
+            Observation o = new Observation(metricsList._1()._1(),metricsList._1()._2(), (Object)td, StringsUtil.getHashForTags(metricsList._1()._2()), batchDurationInSec, count, System.currentTimeMillis(),now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE),Observation.type.tdigest);
+            metricsDao.addTDigest(o);
           }
         }
       }

@@ -50,6 +50,7 @@ public class StringsUtil {
 			hashForTags.append(getHash((tag.trim())));
 			hashForTags.append(".+");
 		}
+		log.info("Generated regex for tags: "+tags+" "+hashForTags.toString());
 		return hashForTags.substring(0, hashForTags.length()-2).toString();
 	}
 

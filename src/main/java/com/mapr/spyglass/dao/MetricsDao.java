@@ -8,7 +8,6 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
-import java.util.TimeZone;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.SerializationUtils;
@@ -23,7 +22,7 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TableDescriptor;
 import com.mapr.spyglass.model.Metric;
-import com.mapr.spyglass.solution.DateTime;
+import com.mapr.spyglass.model.Observation;
 import com.mapr.spyglass.solution.StringsUtil;
 import com.tdunning.math.stats.FloatHistogram;
 import com.tdunning.math.stats.MergingDigest;
@@ -90,27 +89,42 @@ public class MetricsDao implements java.io.Serializable {
 		table.insert(query, rec);
 	}
 
-	// Add histogram to document with id "metricName.timestamp"
-	public void addTDigest(String metricName,long timestamp, String tags, TDigest tDigest, double count, int windowDuration) throws Exception{
-		String hash = StringsUtil.getHashForTags(tags);
-		Calendar now = Calendar.getInstance();
-//		//get current TimeZone using getTimeZone method of Calendar class
-//    TimeZone timeZone = now.getTimeZone();
-//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
-    String query = metricName+timestamp+hash;
-		log.info("Adding document: "+query);
-		byte[] tempByteArray = SerializationUtils.serialize((Serializable) tDigest);
+	// Add t-digest to document with id "metricName.timestamp"
+	public void addTDigest(Observation o) throws Exception{
+		//		//get current TimeZone using getTimeZone method of Calendar class
+		//    TimeZone timeZone = now.getTimeZone();
+		//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
+		String query = o.getMetricName()+o.getTimeStamp()+o.getHash();
+		log.info("Adding t-digest: "+query);
+		byte[] tempByteArray = SerializationUtils.serialize((Serializable) o.getData());
 		Document rec = Json.newDocument()
 				.set("tdigest",Base64.encodeBase64String(tempByteArray))
-				.set("timestamp",timestamp)
-				.set("hash",hash)
-				.set("tags",tags)
-				.set("windowduration", windowDuration)
-				.set("count", count)
-				.set("hour", now.get(Calendar.HOUR_OF_DAY))
-				.set("minute", now.get(Calendar.MINUTE));
+				.set("timestamp",o.getTimeStamp())
+				.set("hash",o.getHash())
+				.set("tags",o.getTags())
+				.set("windowduration", o.getWindowDuration())
+				.set("totalcount", o.getNumOfDataPoints())
+				.set("hour", o.getHour())
+				.set("minute", o.getMinute());
 		table.insert(query, rec);
-		now = null;
+	}
+
+	public void addCounts(Observation o) throws Exception {
+		//		//get current TimeZone using getTimeZone method of Calendar class
+		//    TimeZone timeZone = now.getTimeZone();
+		//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
+		String query = o.getMetricName()+o.getTimeStamp()+o.getHash();
+		log.info("Adding count-array: "+query);
+		Document rec = Json.newDocument()
+				.setArray("counts",o.getData())
+				.set("timestamp",o.getTimeStamp())
+				.set("hash",o.getHash())
+				.set("tags",o.getTags())
+				.set("windowduration", o.getWindowDuration())
+				.set("totalcount", o.getNumOfDataPoints())
+				.set("hour", o.getHour())
+				.set("minute", o.getMinute());
+		table.insert(query, rec);
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios

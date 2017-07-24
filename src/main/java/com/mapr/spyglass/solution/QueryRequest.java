@@ -24,6 +24,7 @@ import com.google.common.collect.Multiset;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.exceptions.TableNotFoundException;
+import com.mapr.spyglass.model.Metric;
 import com.mapr.spyglass.model.Observation;
 import com.tdunning.math.stats.FloatHistogram;
 
@@ -40,7 +41,7 @@ public class QueryRequest {
 	 * Example 3: com.mapr.spyglass.solution.QueryRequest /var/mapr/mapr.monitoring/histograms/ insert 1488322451462 1488913082690 60 20 histogram [op=insert,fqdn=qa102-40.qa.lab]
 	 */
 	private static final Logger log = Logger.getLogger(QueryRequest.class);
-	
+
 	public static void main(String[] args) {
 		if (args.length < 6) {
 			printUsage();
@@ -59,7 +60,7 @@ public class QueryRequest {
 		if (args.length == 8) {
 			tags = args[7];
 		}
-		
+
 		//List<String> results = performComputations(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, threshold,tags,documentType);
 		List<Document> documentsList = getDocuments(tableName, tagKey, fromDuration, toDuration, windowDurationInSec, tags, null, null);
 		for (Document d : documentsList) {
@@ -71,7 +72,7 @@ public class QueryRequest {
 			System.out.println(d.getInt("hour"));
 		}
 	}
-	
+
 	public static Map<String, FloatHistogram> getAggregatedHistogram(String tableName, String tagKey,
 			String fromDuration, String toDuration, String windowDurationInSec, String tags) throws Exception {
 		Map<String, FloatHistogram> histogramMap = new HashMap<String, FloatHistogram>();
@@ -98,17 +99,15 @@ public class QueryRequest {
 			for (Document d : documentsList) {
 				FloatHistogram histogram = (FloatHistogram) SerializationUtils
 						.deserialize(Base64.decodeBase64(d.getString(documentType)));
-				List<String> tagsList = Arrays.asList(d.getString("tags").trim().replaceAll("\\{|\\}", "").split("\\s*,\\s*"));
 				String metricName = d.getString("metricname");
 				int windowDuration = d.getInt("windowduration");
 				int operationCount = d.getInt("count");
 				count += operationCount;
-
-				observations.add(new Observation(tagsList, histogram, metricName, windowDuration, operationCount));
+				observations.add(new Observation(metricName, d.getString("tags"), histogram, d.getString("hash"),windowDuration, operationCount,d.getLong("timestamp"), d.getInt("hour"), d.getInt("minute"),Observation.type.floathistogram));
 			}
 
 			results.add("Total Operations Count: " + count);
-			getLLR(Integer.parseInt(threshold), observations, results);
+			getLLRHistogramData(Integer.parseInt(threshold), observations, results);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -123,27 +122,27 @@ public class QueryRequest {
 			}
 
 			Table table = MapRDB.getTable(tableName);
-			log.info("Table: "+table.getPath());
+			//log.info("Table: "+table.getPath());
 			//	get Calendar instance
-	    Calendar now = Calendar.getInstance();
-	    //get current TimeZone using getTimeZone method of Calendar class
-	    TimeZone timeZone = now.getTimeZone();
-	    String timeZoneId = timeZone.getID();
-	    log.info("Time Zone: "+ timeZoneId);
-	    log.info("Document Key: "+documentKey);
+			Calendar now = Calendar.getInstance();
+			//get current TimeZone using getTimeZone method of Calendar class
+			TimeZone timeZone = now.getTimeZone();
+			String timeZoneId = timeZone.getID();
+			//log.info("Time Zone: "+ timeZoneId);
+			//log.info("Document Key: "+documentKey);
 
-	    String fromId = documentKey+DateTime.parseDateTimeString(fromDuration, timeZoneId);
-	    String toId = documentKey+(((toDuration == null) || (toDuration.isEmpty())) ? System.currentTimeMillis(): DateTime.parseDateTimeString(toDuration,  timeZoneId));
+			String fromId = documentKey+DateTime.parseDateTimeString(fromDuration, timeZoneId);
+			String toId = documentKey+(((toDuration == null) || (toDuration.isEmpty())) ? System.currentTimeMillis(): DateTime.parseDateTimeString(toDuration,  timeZoneId));
 
-	    QueryCondition condition = MapRDB.newCondition().and().is("_id", QueryCondition.Op.GREATER_OR_EQUAL, fromId)
-	      .is("_id", QueryCondition.Op.LESS_OR_EQUAL, toId)
-        .is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
+			QueryCondition condition = MapRDB.newCondition().and().is("_id", QueryCondition.Op.GREATER_OR_EQUAL, fromId)
+					.is("_id", QueryCondition.Op.LESS_OR_EQUAL, toId)
+					.is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
 
 			if ((tags != null) && (!(tags.isEmpty()))) {
 				QueryCondition optionalCondition = MapRDB.newCondition()
 						.matches("hash", StringsUtil.getRegexForTags(tags)).build();
 				condition.condition(optionalCondition);
-	    }
+			}
 
 			if ((hourOfDay != null) && (!(hourOfDay.isEmpty()))) {
 				QueryCondition optionalCondition1 = MapRDB.newCondition()
@@ -158,7 +157,7 @@ public class QueryRequest {
 			}
 
 			condition.close().build();
-			
+
 			log.info("Condition: " + condition);
 			DocumentStream docStream = table.find(condition);
 			Iterator<Document> documentsIterator = docStream.iterator();
@@ -176,15 +175,55 @@ public class QueryRequest {
 		return documentsList;
 	}
 
-	public static void getLLR(int threshold, List<Observation> data, List<String> results) {
+	public static List<String> getLLR(List<Metric> metricsData, String topic1, String topic2) {
+		List<String> results = new ArrayList<String>();
+		Multiset<String> k11 = HashMultiset.create();
+		Multiset<String> k12 = HashMultiset.create();
+		int kx1 = 0;
+		int kx2 = 0;
+		results.add("Documents Size: " + metricsData.size());
+		for (Metric metric : metricsData) {
+			int toLeft = 0;
+			int toRight = 0;
+			List<String> tagsList = Arrays.asList(metric.getTags().toString().trim().replaceAll("\\{|\\}", "").split("\\s*,\\s*"));
+			//log.info("Metrics: "+metric.toString());
+			//log.info("Tags: "+tagsList);
+			if (topic1.equalsIgnoreCase(metric.getMetricName())) {
+				toLeft = (int) metric.getValue();
+			} else if (topic2.equalsIgnoreCase(metric.getMetricName())) {
+				toRight = (int) metric.getValue();
+			}
+
+			for (String tag : tagsList) {
+				//log.info("Tag,toRight: "+tag+","+toRight);
+				k11.add(tag, toRight);
+			}
+
+			for (String tag :tagsList) {
+				//log.info("Tag,toLeft: "+tag+","+toLeft);
+				k12.add(tag, toLeft);
+			}
+			kx1 += toRight;
+			kx2 += toLeft;
+		}
+		results.add("Tag: k11, k12, k21, k22, LogLikelihoodRatio");
+		for (String tag : k11.elementSet()) {
+			results.add(tag + ": " + k11.count(tag) + ", " + k12.count(tag) + ", " + (kx1 - k11.count(tag)) + ", "
+					+ (kx2 - k12.count(tag)) + ", " + LogLikelihood.rootLogLikelihoodRatio(k11.count(tag),
+							k12.count(tag), kx1 - k11.count(tag), kx2 - k12.count(tag)));
+		}
+		return results;
+	}
+
+	public static void getLLRHistogramData(int threshold, List<Observation> data, List<String> results) {
 		Multiset<String> k11 = HashMultiset.create();
 		Multiset<String> k12 = HashMultiset.create();
 		int kx1 = 0;
 		int kx2 = 0;
 		results.add("Documents Size: " + data.size());
 		for (Observation datum : data) {
-			long[] counts = datum.getHistogram().getCounts();
-			double[] centers = datum.getHistogram().getBounds();
+			long[] counts = ((FloatHistogram) datum.getData()).getCounts();
+			double[] centers = ((FloatHistogram) datum.getData()).getBounds();
 			int toLeft = 0;
 			int toRight = 0;
 			for (int i = 0; i < centers.length; ++i) {
@@ -194,12 +233,12 @@ public class QueryRequest {
 					toRight = (int) (toRight + counts[i]);
 				}
 			}
-
-			for (String tag : datum.getTags()) {
+			List<String> tagsList = Arrays.asList(datum.getTags().trim().replaceAll("\\{|\\}", "").split("\\s*,\\s*"));
+			for (String tag : tagsList) {
 				k11.add(tag, toRight);
 			}
 
-			for (String tag : datum.getTags()) {
+			for (String tag : tagsList) {
 				k12.add(tag, toLeft);
 			}
 			kx1 += toRight;

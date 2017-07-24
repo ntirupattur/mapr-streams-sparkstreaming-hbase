@@ -1,23 +1,35 @@
 package com.mapr.spyglass.model;
 
-import java.util.List;
-import java.util.Set;
+import java.io.Serializable;
 
-import com.tdunning.math.stats.FloatHistogram;
-
-public class Observation {
-  List<String> tags;
-  FloatHistogram histogram;
-  String metricName;
+public class Observation implements Serializable {
+  /**
+	 *
+	 */
+	private static final long serialVersionUID = 1L;
+	String metricName;
+	String tags;
+  Object data;
+  String hash;
   int windowDuration;
-  int operationCount;
-  
-  public Observation(List<String> tags, FloatHistogram histogram, String metricName, int windowDuration, int operationCount) {
-    this.tags = tags;
-    this.histogram = histogram;
-    this.operationCount = operationCount;
+  int numOfDataPoints;
+  long timeStamp;
+  int hour, minute;
+  public static enum type { floathistogram, tdigest, countarray}
+  type objectType;
+
+
+  public Observation(String metricName, String tags, Object data, String hash, int windowDuration, int numOfDataPoints, long timeStamp, int hour, int minute, Observation.type type) {
+  	this.metricName = metricName;
+  	this.tags = tags;
+    this.data = data;
+    this.hash = hash;
+    this.numOfDataPoints = numOfDataPoints;
     this.windowDuration = windowDuration;
-    this.metricName = metricName;
+    this.timeStamp = timeStamp;
+    this.hour = hour;
+    this.minute = minute;
+    this.objectType = type;
   }
   
   /**
@@ -28,13 +40,6 @@ public class Observation {
   }
 
   /**
-   * @param metricName the metricName to set
-   */
-  public void setMetricName(String metricName) {
-    this.metricName = metricName;
-  }
-
-  /**
    * @return the windowDuration
    */
   public int getWindowDuration() {
@@ -42,50 +47,45 @@ public class Observation {
   }
 
   /**
-   * @param windowDuration the windowDuration to set
-   */
-  public void setWindowDuration(int windowDuration) {
-    this.windowDuration = windowDuration;
-  }
-
-  /**
    * @return the operationCount
    */
-  public int getOperationCount() {
-    return operationCount;
-  }
-
-  /**
-   * @param operationCount the operationCount to set
-   */
-  public void setOperationCount(int operationCount) {
-    this.operationCount = operationCount;
+  public int getNumOfDataPoints() {
+    return numOfDataPoints;
   }
 
   /**
    * @return the tags
    */
-  public List<String> getTags() {
+  public String getTags() {
     return tags;
   }
-  /**
-   * @param tags the tags to set
-   */
-  public void setTags(List<String> tags) {
-    this.tags = tags;
-  }
+
   /**
    * @return the histogram
    */
-  public FloatHistogram getHistogram() {
-    return histogram;
+  public Object getData() {
+    return data;
   }
-  /**
-   * @param histogram the histogram to set
-   */
-  public void setHistogram(FloatHistogram histogram) {
-    this.histogram = histogram;
-  }
+ 
+	public long getTimeStamp() {
+		return timeStamp;
+	}
+
+	public int getHour() {
+		return hour;
+	}
+
+	public int getMinute() {
+		return minute;
+	}
+
+	public type getObjectType() {
+		return objectType;
+	}
+
+	public String getHash() {
+		return hash;
+	}
   
 }
 
