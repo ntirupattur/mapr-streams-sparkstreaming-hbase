@@ -1,5 +1,6 @@
 package com.mapr.spyglass.solution;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -13,7 +14,7 @@ public class AnomalyDetector {
 
 	private static final Logger log = Logger.getLogger(AnomalyDetector.class);
 
-	public static Callable<Double> findAnomalies(final String tableName, final Observation o) {
+	public static Callable<Double> calculateEntropy(final QueryRequest request, final Observation o, final String start, final String end, final String hour, final String minute) {
 
 		Callable<Double> task = new Callable<Double>() {
 			@Override
@@ -22,8 +23,8 @@ public class AnomalyDetector {
 
 				int[] currentCounts = (int[]) o.getData();
 				int numOfDataPoints = o.getNumOfDataPoints();
-
-				List<Document> documents = QueryRequest.getDocuments(tableName, o.getMetricName(), "1h-ago", "now", String.valueOf(o.getWindowDuration()), o.getTags(), null, null);
+				// TODO - Add caching logic here to avoid querying DB tables again and again for same data
+				List<Document> documents = request.getDocuments(o.getMetricName(), start, end, String.valueOf(o.getWindowDuration()), o.getTags(), hour, minute);
 				long numOfHistoricDataPoints=0;
 				int[] historicCounts = new int[33]; // TODO - Make this value configurable
 				for (Document d: documents) {
@@ -40,15 +41,20 @@ public class AnomalyDetector {
 				double relativeEntropy = 0.0;
 				for (int i=0;i<currentCounts.length;i++) {
 					currentDistribution[i] = (double)currentCounts[i]/numOfDataPoints;
-					historicDistribution[i] = (double)historicCounts[i]/numOfHistoricDataPoints;
+					if (numOfHistoricDataPoints != 0)
+						historicDistribution[i] = (double)historicCounts[i]/numOfHistoricDataPoints;
+					else
+						historicDistribution[i] = 0.0;
+					//log.info("Current Count: "+currentCounts[i]+" Historic Count: "+historicCounts[i]+" Current Size: "+numOfDataPoints+" Historic Size: "+numOfHistoricDataPoints);
 					if (historicDistribution[i] == 0.0 || currentDistribution[i] == 0.0)
 						relativeEntropy = relativeEntropy + 0.0;
 					else
 						relativeEntropy = relativeEntropy + (currentDistribution[i] * Math.log(currentDistribution[i]/historicDistribution[i]));
 					//log.info("Current Distribution: "+currentDistribution[i]+" historic distribution: "+historicDistribution[i]+" relative entropy: "+relativeEntropy);
 				}
-					
-				log.info("Relative entropy for the metric: "+o.getMetricName()+" with tags: "+o.getTags()+" is: "+relativeEntropy);
+
+				log.info("Current Distribution: "+Arrays.toString(currentDistribution)+" count: "+numOfDataPoints+" Historic Distribution: "+Arrays.toString(historicDistribution)+" count: "+numOfHistoricDataPoints);
+				log.info("Relative entropy for the metric: "+o.getMetricName()+" with tags: "+o.getTags()+" is: "+relativeEntropy+" from "+start+" to "+end+" at "+hour);
 				return relativeEntropy;
 			}
 		};

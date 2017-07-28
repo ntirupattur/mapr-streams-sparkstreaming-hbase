@@ -114,7 +114,7 @@ public class MetricsDao implements java.io.Serializable {
 		//    TimeZone timeZone = now.getTimeZone();
 		//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
 		String query = o.getMetricName()+o.getTimeStamp()+o.getHash();
-		log.info("Adding count-array: "+query);
+		log.info("Adding count-array: "+query+" at "+o.getHour()+":"+o.getMinute());
 		Document rec = Json.newDocument()
 				.setArray("counts",o.getData())
 				.set("timestamp",o.getTimeStamp())
