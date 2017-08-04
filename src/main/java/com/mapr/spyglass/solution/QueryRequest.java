@@ -146,34 +146,37 @@ public class QueryRequest {
 			String timeZoneId = timeZone.getID();
 			//log.info("Time Zone: "+ timeZoneId);
 			//log.info("Document Key: "+documentKey);
-			StringBuffer conditionBuffer = new StringBuffer();
+			//StringBuffer conditionBuffer = new StringBuffer();
 
-			String fromId = documentKey+DateTime.parseDateTimeString(fromDuration, timeZoneId);
-			conditionBuffer.append(fromId);
-			String toId = documentKey+(((toDuration == null) || (toDuration.isEmpty())) ? System.currentTimeMillis(): DateTime.parseDateTimeString(toDuration,  timeZoneId));
-			conditionBuffer.append(toId);
-
-			QueryCondition condition = MapRDB.newCondition().and().is("_id", QueryCondition.Op.GREATER_OR_EQUAL, fromId)
-					.is("_id", QueryCondition.Op.LESS_OR_EQUAL, toId)
-					.is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
-
+			String tagsHash = "";
 			if ((tags != null) && (!(tags.isEmpty()))) {
-				String tagsHash = StringsUtil.getRegexForTags(tags);
-				conditionBuffer.append(tagsHash);
-				QueryCondition optionalCondition = MapRDB.newCondition()
-						.matches("hash", tagsHash).build();
-				condition.condition(optionalCondition);
+				tagsHash = StringsUtil.getRegexForTags(tags);
 			}
 
+			String fromId = documentKey+DateTime.parseDateTimeString(fromDuration, timeZoneId)+tagsHash;
+			//conditionBuffer.append(fromId.trim());
+			String toId = documentKey+(((toDuration == null) || (toDuration.isEmpty())) ? System.currentTimeMillis(): DateTime.parseDateTimeString(toDuration,  timeZoneId))+tagsHash;
+			//conditionBuffer.append(toId.trim());
+
+			QueryCondition condition = MapRDB.newCondition().and().is("_id", QueryCondition.Op.GREATER_OR_EQUAL, fromId.trim())
+					.is("_id", QueryCondition.Op.LESS_OR_EQUAL, toId.trim())
+					.is("windowduration", QueryCondition.Op.EQUAL, Integer.parseInt(windowDurationInSec));
+
+//			if ((tags != null) && (!(tags.isEmpty()))) {
+//				QueryCondition optionalCondition = MapRDB.newCondition()
+//						.matches("tags", tags).build();
+//				condition.condition(optionalCondition);
+//			}
+
 			if ((hourOfDay != null) && (!(hourOfDay.isEmpty()))) {
-				conditionBuffer.append(hourOfDay);
+				//conditionBuffer.append(hourOfDay);
 				QueryCondition optionalCondition1 = MapRDB.newCondition()
 						.is("hour", QueryCondition.Op.EQUAL, Integer.parseInt(hourOfDay)).build();
 				condition.condition(optionalCondition1);
 			}
 
 			if ((minuteOfHour != null) && (!(minuteOfHour.isEmpty()))) {
-				conditionBuffer.append(minuteOfHour);
+				//conditionBuffer.append(minuteOfHour);
 				QueryCondition optionalCondition2 = MapRDB.newCondition()
 						.is("minute", QueryCondition.Op.EQUAL, Integer.parseInt(minuteOfHour)).build();
 				condition.condition(optionalCondition2);
@@ -181,21 +184,21 @@ public class QueryRequest {
 
 			condition.close().build();
 
-			log.info("Cache size: "+cache.size());
-
-			if (cache.get(conditionBuffer.toString().trim()) != null) {
-				documentsList = (List<Document>) cache.get(conditionBuffer.toString().trim());
-				log.info("Found in the cache for condition: "+conditionBuffer.toString().trim());
-			} else {
-				log.info("Fetching from DB for condition: " + conditionBuffer.toString().trim());
+//			log.info("Cache size: "+cache.size());
+//
+//			if (cache.get(conditionBuffer.toString().trim()) != null) {
+//				documentsList = (List<Document>) cache.get(conditionBuffer.toString().trim());
+//				log.info("Found in the cache for condition: "+conditionBuffer.toString().trim());
+//			} else {
+				log.info("Fetching from DB for condition: " + condition.toString().trim());
 				DocumentStream docStream = table.find(condition);
 				Iterator<Document> documentsIterator = docStream.iterator();
 				while (documentsIterator.hasNext()) {
 					Document d = (Document) documentsIterator.next();
 					documentsList.add(d);
 				}
-				cache.put(conditionBuffer.toString().trim(), documentsList);
-			}
+//				cache.put(conditionBuffer.toString().trim(), documentsList);
+//			}
 
 			log.info("Documents Size: "+documentsList.size());
 			log.info("Time taken: "+(System.currentTimeMillis() - startTime));

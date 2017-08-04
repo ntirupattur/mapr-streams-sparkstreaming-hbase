@@ -124,7 +124,7 @@ public class MetricsDao implements java.io.Serializable {
 				.set("totalcount", o.getNumOfDataPoints())
 				.set("hour", o.getHour())
 				.set("minute", o.getMinute());
-		table.insert(query, rec);
+		table.insertOrReplace(query, rec);
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios

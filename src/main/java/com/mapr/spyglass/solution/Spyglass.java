@@ -43,7 +43,6 @@ import scala.Tuple2;
 public class Spyglass {
 
 	private static final Logger log = Logger.getLogger(Spyglass.class);
-	private static KafkaProducer<String, String> producer;
 
 	public static void main(String[] args) throws Exception {
 		SparkConf sparkConf = new SparkConf().setAppName("Spyglass"+Math.random());
@@ -71,7 +70,7 @@ public class Spyglass {
 					tagNamesList = args[4];
 				}
 			} catch (Exception e){
-				System.out.println("Failed to start spark job with exception: "+e.getCause());
+				log.error("Failed to start spark job with exception: "+e.getCause());
 				printUsage();
 				return;
 			}
@@ -114,15 +113,13 @@ public class Spyglass {
 		});
 
 		//TODO - Evaluate how to filter metrics based on tags
-
-		final ExecutorService anomalyDetectorService = Executors.newCachedThreadPool();
+		final AnomalyDetectorService anomalyDetector = new AnomalyDetectorService();
 		// for graceful shutdown of the application ...
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
 				log.info("Shutting down streaming app...");
-				producer.close();
-				anomalyDetectorService.shutdown();
+				anomalyDetector.shutdown();
 				jssc.stop(true, true);
 				log.info("Shutdown of streaming app complete.");
 			}
@@ -130,7 +127,6 @@ public class Spyglass {
 
 		final MetricsDao metricsDao = new MetricsDao(tableName);
 		final QueryRequest request = new QueryRequest(tableName);
-		configureProducer();
 
 		// Create a mapped stream of <metricname+tags, value>
 		JavaPairDStream<Tuple2<String,String>, Double> metricStream = metricsStream.mapToPair(new PairFunction<Metric, Tuple2<String, String>, Double>() {
@@ -186,66 +182,10 @@ public class Spyglass {
 						log.info("Adding count for metric: "+aggregatedMetric._1()._1()+" with tags"+aggregatedMetric._1()._2()+" total count "+Arrays.toString(aggregatedMetric._2._1())+" "+aggregatedMetric._2._2());
 						final Calendar now = Calendar.getInstance();
 						final TimeZone timeZone = now.getTimeZone();
-						final String timeZoneId = timeZone.getID();
 						final int hour = now.get(Calendar.HOUR_OF_DAY);
 						final int minute = now.get(Calendar.MINUTE);
 						final Observation o = new Observation(aggregatedMetric._1()._1(),aggregatedMetric._1()._2(), (Object)aggregatedMetric._2()._1(), StringsUtil.getHashForTags(aggregatedMetric._1()._2()), batchDurationInSec, aggregatedMetric._2._2(), System.currentTimeMillis(),hour,minute,Observation.type.countarray);
-
-						// TODO - Add a way to set the trend criteria (like last week, last 1 day etc) via configuration instead of code change
-						Future<Double> lastOneHourResult = anomalyDetectorService.submit(AnomalyDetector.calculateEntropy(request, o, "1h-ago", "now", null, null));
-						double relativeEntropy = lastOneHourResult.get();
-						log.info("Relative Entropy for last 1h:  "+relativeEntropy+" calculated at: "+hour+":"+minute);
-
-						// Get timestamp of current base hour yesterday
-						long oneDayAgo = DateTime.parseDateTimeString("1d-ago", timeZoneId);
-						long oneDayAgoBaseHour = DateTime.previousInterval(oneDayAgo, 1, Calendar.HOUR_OF_DAY, timeZone).getTimeInMillis();
-
-						// Get timestamp of base hour for current timestamp
-						long currentBaseHour = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone).getTimeInMillis();
-
-						// Calculate the relative entropy for distribution at same base hour yesterday
-						Future<Double> yesterdayResult = anomalyDetectorService.submit(AnomalyDetector.calculateEntropy(request, o, String.valueOf(oneDayAgoBaseHour), String.valueOf(currentBaseHour), String.valueOf(o.getHour()), null));
-						double relativeEntropyYesterday = yesterdayResult.get();
-						log.info("Relative Entropy for yesterday:  "+relativeEntropyYesterday+" calculated at: "+hour+":"+minute);
-
-						// Get timestamp of current base hour same day last week
-						long oneWeekAgo = DateTime.parseDateTimeString("7d-ago", timeZoneId);
-						long oneWeekAgoBaseHour = DateTime.previousInterval(oneWeekAgo, 1, Calendar.HOUR_OF_DAY, timeZone).getTimeInMillis();
-
-						// Get timestamp of current base hour same day 6d ago
-						long sixdaysAgo = DateTime.parseDateTimeString("6d-ago", timeZoneId);
-						long sixdaysAgoBaseHour = DateTime.previousInterval(sixdaysAgo, 1, Calendar.HOUR_OF_DAY, timeZone).getTimeInMillis();
-
-						// Calculate the relative entropy for distribution at same base hour same day last week
-						Future<Double> lastWeekResult = anomalyDetectorService.submit(AnomalyDetector.calculateEntropy(request, o, String.valueOf(oneWeekAgoBaseHour), String.valueOf(sixdaysAgoBaseHour), String.valueOf(o.getHour()), null));
-						double relativeEntropyLastWeek = lastWeekResult.get();
-
-						log.info("Relative Entropy for last week:  "+relativeEntropyLastWeek+" calculated at: "+hour+":"+minute);
-
-						//TODO - Make this configurable
-						int totalCount = 3;
-						int runningCount = 0;
-						if ((2*relativeEntropy*aggregatedMetric._2._2()) > threshold) {
-							runningCount++;
-						}
-						if ((2*relativeEntropyYesterday*aggregatedMetric._2._2()) > threshold) {
-							runningCount++;
-						}
-						if ((2*relativeEntropyLastWeek*aggregatedMetric._2._2()) > threshold) {
-							runningCount++;
-						}
-
-						log.info("Running Count: "+runningCount);
-						// TODO - Make this check configurable
-						if ( runningCount == totalCount || (double)runningCount/totalCount > 0.6) {
-							//put cpu.percent 1500323100 84.8637739656912 fqdn=mfs81.qa.lab  cpu_core=7 cpu_class=idle  clusterid=2992001618649411846 clustername=my.cluster.com
-							String value = "put mapr.anomalies "+o.getTimeStamp()+" "+relativeEntropy+" metric="+o.getMetricName()+" "+o.getTags().trim().replaceAll("\\{|\\}", "").replaceAll(",", " ");
-							log.info("Sending record "+value);
-							ProducerRecord<String, String> rec = new ProducerRecord<String, String>(streamName+":mapr.anomalies",o.getMetricName(), value);
-							producer.send(rec);
-							log.info("Found anomaly in this distribution with relative entropy: "+relativeEntropy);
-						}
-						metricsDao.addCounts(o);
+						anomalyDetector.submit(o, request, metricsDao, hour, minute, timeZone, streamName, threshold);
 					}
 				}
 			}
@@ -332,19 +272,6 @@ public class Spyglass {
 		// Start the computation
 		jssc.start();
 		jssc.awaitTermination();
-	}
-
-	/* Set the value for a configuration parameter.
-  This configuration parameter specifies which class
-  to use to serialize the value of each message.*/
-	public static void configureProducer() {
-		Properties props = new Properties();
-		props.put("key.serializer",
-				"org.apache.kafka.common.serialization.StringSerializer");
-		props.put("value.serializer",
-				"org.apache.kafka.common.serialization.StringSerializer");
-
-		producer = new KafkaProducer<String, String>(props);
 	}
 
 	public static double normalize(double value, double min, double max) {
