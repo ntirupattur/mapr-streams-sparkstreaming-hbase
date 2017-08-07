@@ -113,9 +113,10 @@ public class MetricsDao implements java.io.Serializable {
 		//		//get current TimeZone using getTimeZone method of Calendar class
 		//    TimeZone timeZone = now.getTimeZone();
 		//    Calendar previous = DateTime.previousInterval(System.currentTimeMillis(), 1, Calendar.HOUR_OF_DAY, timeZone);
-		String query = o.getMetricName()+o.getTimeStamp()+o.getHash();
-		log.info("Adding count-array: "+query+" at "+o.getHour()+":"+o.getMinute());
+		String id = o.getMetricName()+o.getTimeStamp()+o.getHash();
+		log.info("Adding count-array: "+id+" at "+o.getHour()+":"+o.getMinute());
 		Document rec = Json.newDocument()
+				.setId(id)
 				.setArray("counts",o.getData())
 				.set("timestamp",o.getTimeStamp())
 				.set("hash",o.getHash())
@@ -124,7 +125,8 @@ public class MetricsDao implements java.io.Serializable {
 				.set("totalcount", o.getNumOfDataPoints())
 				.set("hour", o.getHour())
 				.set("minute", o.getMinute());
-		table.insertOrReplace(query, rec);
+		log.info("Document being added: "+rec.asJsonString());
+		table.insertOrReplace(rec);
 	}
 
 	// TODO - Make this function less generic to separate data loading vs testing scenarios

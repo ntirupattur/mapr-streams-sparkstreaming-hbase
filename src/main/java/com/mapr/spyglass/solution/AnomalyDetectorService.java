@@ -101,7 +101,6 @@ public class AnomalyDetectorService {
 	public void detectAnomaly(final Observation o, final QueryRequest request, final MetricsDao metricsDao, final int hour, final int minute, final TimeZone timeZone, final String streamName, final double threshold) {
 		try {
 			final String timeZoneId = timeZone.getID();
-
 			// TODO - Add a way to set the trend criteria (like last week, last 1 day etc) via configuration instead of code change
 			Future<Double> lastOneHourResult = anomalyDetector.submit(calculateEntropy(request, o, "1h-ago", "now", null, null));
 
